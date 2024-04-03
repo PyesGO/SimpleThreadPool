@@ -1,5 +1,5 @@
 # built-in modules:
-import asyncio as _asyncio
+# import asyncio as _asyncio
 import os as _os
 import typing as _tp
 from collections import (
@@ -16,10 +16,10 @@ from weakref import (
     WeakSet as _WeakSet,
 )
 
-# third party modules:
-from aiohttp import (
-    client as _aiohttp_client,
-)
+# # third party modules:
+# from aiohttp import (
+#     client as _aiohttp_client,
+# )
 
 _LOGGER = _getLogger(__name__)
 
