@@ -1,5 +1,3 @@
-#!/home/yjtfx/Personal-Data/Python_Venv/Normal/bin/python
-
 import logging
 import time
 
@@ -14,9 +12,10 @@ LOGGER = logging.getLogger(__name__)
 
 
 def test(sec: int) -> None:
-    data = b"\0" * 1024**2
+    # data = b"\0" * 1024**2
     time.sleep(2)
     LOGGER.info("The test function has running finished.")
+    return "Test Str"
 
 
 def cb(task: core.ThreadTask) -> None:
