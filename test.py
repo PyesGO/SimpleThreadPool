@@ -3,7 +3,7 @@
 import logging
 import time
 
-from api import core
+from threads import SimpleThreadPool
 
 logging.basicConfig(
     format="%(name)s-%(asctime)s-[%(levelname)s]: %(message)s",
