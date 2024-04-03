@@ -27,5 +27,5 @@ for i in range(128):
     task = pool.submit(test, 1)
     task.add_callback(cb)
 
-time.sleep(1)
+time.sleep(8)
 pool.shutdown()
