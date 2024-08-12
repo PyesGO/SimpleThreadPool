@@ -1,5 +1,3 @@
-# built-in modules:
-# import asyncio as _asyncio
 import os as _os
 import typing as _tp
 from collections import (
@@ -11,15 +9,14 @@ from logging import (
 from _thread import (
     allocate_lock as _thread_get_allocate_lock,
     start_new_thread as _thread_new_instance,
+    LockType as _LockType,
 )
 from weakref import (
     WeakSet as _WeakSet,
 )
-
-# # third party modules:
-# from aiohttp import (
-#     client as _aiohttp_client,
-# )
+from time import (
+    monotonic as _monotonic
+)
 
 _LOGGER = _getLogger(__name__)
 
@@ -144,7 +141,38 @@ class WorkerAndTaskManager(object):
         self.waiting_tasks: _tp.Deque[ThreadTask] = _deque()
         #
         self.global_allocate_lock = _thread_get_allocate_lock()
+        self.task_allocate_lock = _thread_get_allocate_lock()
+        #
         self.get_local_allocate_lock = _thread_get_allocate_lock  # note: This callable is not have end parentheses.
+
+    @staticmethod
+    def wait(lock: _LockType, timeout: float = -1) -> None:
+        (not lock.locked()) and (lock.acquire(False))
+        lock.acquire(True, timeout)
+
+    @staticmethod
+    def release(lock: _LockType) -> None:
+        (lock.locked()) and (lock.release())
+
+    def notify(self) -> None:
+        if (self.waiting_tasks) and (self.waiting_workers):
+            self.waiting_workers.pop()._release()
+        self.release(self.global_allocate_lock)
+
+    def get_waiting_task(self) -> _tp.Optional[ThreadTask]:
+        if (self.task_allocate_lock.locked()) or (not self.waiting_tasks):
+            return None
+
+        self.task_allocate_lock.acquire(True)
+        task = self.waiting_tasks.popleft()
+        self.task_allocate_lock.release()
+        return task
+
+    def global_wait(self, timeout: float = -1) -> None:
+        self.wait(self.global_allocate_lock, timeout)
+
+    def global_release(self) -> None:
+        self.release(self.global_allocate_lock)
 
 
 class ThreadWorker(object):
@@ -155,36 +183,32 @@ class ThreadWorker(object):
         self._local_allocate_lock = manager.get_local_allocate_lock()
 
     def _wait(self) -> None:
-        (not self._local_allocate_lock.locked()) and (
-            self._local_allocate_lock.acquire(False)
-        )
-        self._local_allocate_lock.acquire(True)
+        self._manager.wait(self._local_allocate_lock)
 
     def _release(self) -> None:
-        (self._local_allocate_lock.locked()) and (self._local_allocate_lock.release())
+        self._manager.release(self._local_allocate_lock)
 
     def _interal_loop(self) -> None:
+        self._manager.global_release()
         while not self._should_stop:
-            if (not self._manager.global_allocate_lock.locked()) and (
-                self._manager.waiting_tasks
-            ):
-                self._manager.global_allocate_lock.acquire(True)
-                task = self._manager.waiting_tasks.popleft()
-                self._manager.global_allocate_lock.release()
+            task = self._manager.get_waiting_task()
+            if task:
                 self._manager.running_workers.add(self)
                 try:
                     task._run()
                 except Exception as e:
                     _LOGGER.warning(e)
-                finally:
-                    self._manager.running_workers.discard(self)
-                continue
+                else:
+                    self._manager.notify()
+                    continue
 
+            self._manager.running_workers.discard(self)
             self._manager.waiting_workers.add(self)
             self._wait()
             self._manager.waiting_workers.discard(self)
         else:
-            self._release()
+            self._manager.running_workers.discard(self)
+            self._manager.global_release()
             _LOGGER.debug(
                 "The '%s' (thread worker name) has been correctly dismissed."
                 % self._name
@@ -219,6 +243,7 @@ class SimpleThreadPool(object):
 
         self._should_shutdown = False
         self._manager = WorkerAndTaskManager()
+        self._waiter_allocate_lock = _thread_get_allocate_lock()
 
         count = 0
         while count < threads:
@@ -229,6 +254,9 @@ class SimpleThreadPool(object):
             self._manager.workers.append(worker)
             worker.start()
             count += 1
+
+        while len(self._manager.waiting_workers) != threads:
+            self._manager.global_wait()
 
     def submit(
         self,
@@ -247,17 +275,31 @@ class SimpleThreadPool(object):
             callable_kwargs=keyword_arguments,
         )
         self._manager.waiting_tasks.append(task)
+        self._manager.notify()
         return task
 
-    def shutdown(self, wait: bool = True) -> None:
+    def wait(self, timeout: float = -1) -> None:
+        if timeout > 0:
+            start_time = _monotonic()
+        while (timeout != 0) and (
+            self._manager.waiting_tasks or
+            self._manager.running_workers
+        ):
+            self._manager.global_wait(timeout)
+            if timeout > 0:
+                start_time -= (_monotonic() - start_time)
+                if start_time < 0:
+                    timeout = 0
+
+    def shutdown(self, wait: bool = True, timeout: float = -1) -> None:
         self._should_shutdown = True
         _LOGGER.debug("Close the simple thread pool command is already sent.")
 
+        self._manager.waiting_tasks.clear()
         for worker in self._manager.workers:
             worker.dismiss()
 
-        while (wait) and (self._manager.running_workers):
-            worker = self._manager.running_workers.pop()
-            worker._wait()
+        (wait) and (self.wait(timeout))
+        self._manager = None
 
         _LOGGER.debug("The simple thread pool has been correctly closed.")

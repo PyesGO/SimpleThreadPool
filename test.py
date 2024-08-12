@@ -11,21 +11,26 @@ logging.basicConfig(
 LOGGER = logging.getLogger(__name__)
 
 
-def test(sec: int) -> None:
-    # data = b"\0" * 1024**2
+def test(x: int) -> None:
+    LOGGER.info("The test function %d start running." % x)
     time.sleep(2)
-    LOGGER.info("The test function has running finished.")
-    return "Test Str"
+    LOGGER.info("The test function %d  has running finished." % x)
+    return "function return."
 
 
-def cb(task: core.ThreadTask) -> None:
-    LOGGER.info(task.get_result())
+def cb(callback_task: core.ThreadTask) -> None:
+    LOGGER.info(callback_task.get_result())
 
 
-pool = core.SimpleThreadPool(threads=16)
-for i in range(128):
-    task = pool.submit(test, 1)
+pool = core.SimpleThreadPool(threads=32)
+for i in range(64):
+    task = pool.submit(test, i)
     task.add_callback(cb)
 
-time.sleep(8)
+# wait timeout 2 seconds.
+# pool.wait(2)
+pool.wait()
+print("main: wait release")
 pool.shutdown()
+# pool.shutdown(1)
+print("main: pool has been shutdown successful.")
