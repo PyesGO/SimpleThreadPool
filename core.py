@@ -288,7 +288,7 @@ class SimpleThreadPool(object):
             self._manager.global_wait(timeout)
             if timeout > 0:
                 start_time -= (_monotonic() - start_time)
-                if start_time < 0:
+                if start_time <= 0:
                     timeout = 0
 
     def shutdown(self, wait: bool = True, timeout: float = -1) -> None:
