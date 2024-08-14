@@ -294,7 +294,7 @@ class SimpleThreadPool(object):
         self._should_shutdown = True
         _LOGGER.debug("Close the simple thread pool command is already sent.")
 
-        self._manager.task_allocate_lock.acquire(False)
+        self._manager.task_allocate_lock.acquire(True)
         self._manager.waiting_tasks.clear()
         self._manager.task_allocate_lock.release()
 

@@ -15,7 +15,7 @@ def test(x: int) -> None:
     LOGGER.info("The test function %d start running." % x)
     time.sleep(2)
     LOGGER.info("The test function %d  has running finished." % x)
-    return "function return."
+    return "function %d return." % x
 
 
 def cb(callback_task: core.ThreadTask) -> None:
