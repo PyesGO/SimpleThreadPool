@@ -157,7 +157,7 @@ class WorkerAndTaskManager(object):
     def notify(self) -> None:
         if (self.waiting_tasks) and (self.waiting_workers):
             self.waiting_workers.pop()._release()
-        self.release(self.global_allocate_lock)
+        self.global_release()
 
     def get_waiting_task(self) -> _tp.Optional[ThreadTask]:
         if (self.task_allocate_lock.locked()) or (not self.waiting_tasks):
@@ -243,7 +243,6 @@ class SimpleThreadPool(object):
 
         self._should_shutdown = False
         self._manager = WorkerAndTaskManager()
-        self._waiter_allocate_lock = _thread_get_allocate_lock()
 
         count = 0
         while count < threads:
@@ -295,7 +294,10 @@ class SimpleThreadPool(object):
         self._should_shutdown = True
         _LOGGER.debug("Close the simple thread pool command is already sent.")
 
+        self._manager.task_allocate_lock.acquire(False)
         self._manager.waiting_tasks.clear()
+        self._manager.task_allocate_lock.release()
+
         for worker in self._manager.workers:
             worker.dismiss()
 
