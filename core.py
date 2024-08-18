@@ -15,7 +15,7 @@ from weakref import (
     WeakSet as _WeakSet,
 )
 from time import (
-    monotonic as _monotonic
+    monotonic as _monotonic,
 )
 
 _LOGGER = _getLogger(__name__)
@@ -93,7 +93,8 @@ class ThreadTask(object):
             else:
                 _LOGGER.warning(
                     (
-                        "Oops, the '%s' (thread task name) is running with a little error."
+                        "Oops, the '%s' (thread task name) "
+                        "is running with a little error."
                         "The error is '%r'"
                     )
                     % (self._name, self._exception)
@@ -103,8 +104,8 @@ class ThreadTask(object):
     def _ensure_done(self, method: str) -> _tp.Optional[_tp.NoReturn]:
         if not self._done:
             raise RuntimeError(
-                "You should not call the '%s' method because this thread task has not finished running."
-                % method
+                "You should not call the '%s' method "
+                "because this thread task has not finished running." % method
             )
 
     @property
@@ -142,8 +143,8 @@ class WorkerAndTaskManager(object):
         #
         self.global_allocate_lock = _thread_get_allocate_lock()
         self.task_allocate_lock = _thread_get_allocate_lock()
-        #
-        self.get_local_allocate_lock = _thread_get_allocate_lock  # note: This callable is not have end parentheses.
+        # note: This callable is not have end parentheses.
+        self.get_local_allocate_lock = _thread_get_allocate_lock
 
     @staticmethod
     def wait(lock: _LockType, timeout: float = -1) -> None:
@@ -238,7 +239,8 @@ class SimpleThreadPool(object):
             if not threads:
                 raise TypeError(
                     "Because the os module does not provide the cpu count value, "
-                    "so you need to pass in a number that is at least one for the 'threads' parameter."
+                    "so you need to pass in a number that is at least one "
+                    "for the 'threads' parameter."
                 )
 
         self._should_shutdown = False
@@ -265,7 +267,8 @@ class SimpleThreadPool(object):
     ) -> ThreadTask:
         if self._should_shutdown:
             raise RuntimeError(
-                "This simple thread pool has been closed, so you can not recall the 'submit' method."
+                "This simple thread pool has been closed, "
+                "so you can not recall the 'submit' method."
             )
         task = ThreadTask(
             name=self._default_task_prefix % self._task_counter.__next__(),
@@ -281,12 +284,11 @@ class SimpleThreadPool(object):
         if timeout > 0:
             start_time = _monotonic()
         while (timeout != 0) and (
-            self._manager.waiting_tasks or
-            self._manager.running_workers
+            self._manager.waiting_tasks or self._manager.running_workers
         ):
             self._manager.global_wait(timeout)
             if timeout > 0:
-                start_time -= (_monotonic() - start_time)
+                start_time -= _monotonic() - start_time
                 if start_time <= 0:
                     timeout = 0
 
